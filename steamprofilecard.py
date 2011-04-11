@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 0.1.0
+# Version: 0.1.1
 # By: Shawn Silva (shawn at jatgam dot com)
 # 
-# Created: 4/6/2011
-# Modified: 4/6/2011
+# Created: 04/06/2011
+# Modified: 04/11/2011
 # 
 # Using the Steam Web API this script will make a "gamer card" of a
 # given Steam Profile and return a PNG image.
@@ -43,7 +43,6 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 #                               TODO                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# - Fix font/images size/placement to be more appealing.
 # - Change the way fonts are designated to be easily modified.
 # - Implement background templates so the image isn't solid black
 #   behind the steam information.
@@ -54,17 +53,22 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                             CHANGELOG                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# 4/6/2011		v0.1.0 - Initial script creation.
+# 04/11/2011		v0.1.1 - Changed resize filter for to improve
+#                            quality. Set final alignment for data.
+# 04/06/2011		v0.1.0 - Initial script creation.
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 import urllib2, cStringIO, re
 import xml.etree.ElementTree as ET
 import ImageFont, ImageDraw
 from PIL import Image
 
+fontlarge = ImageFont.truetype("c:\FreeSansBold.ttf", 12, encoding="unic")
+font = ImageFont.truetype("c:\FreeSansBold.ttf", 8, encoding="unic")
+
 class SteamProfileCard:
-	def __init__(self, steamuserid, type, template):
+	def __init__(self, steamuserid, imgtype, template):
 		self.steamuserid = steamuserid
-		self.type = type
+		self.imgtype = imgtype
 		self.template = template
 		self.steampuburl = self.__steamURLType(self.steamuserid)
 		self.__steamPublicXMLParse(self.steampuburl)
@@ -159,53 +163,53 @@ class SteamProfileCard:
 		"""
 		Draws a new image with PIL based on Steam User Info. Returns a PIL image object.
 		"""
-		image = Image.new("RGB", (210,150))
+		image = Image.new("RGB", (210,150), color="#808080")
 		draw = ImageDraw.Draw(image)
-		#font = ImageFont.load_default()
-		font = ImageFont.truetype("c:\FreeMonoBold.ttf", 9, encoding="unic")
-		draw.text((30,10), self.steamcustomurl, font=font)
 		
 		
-		draw.text((80,20), self.id, font=font)
+		draw.text((70,35), self.id, font=fontlarge)
 		txttowrt = "Joined: %s"  % (self.membersince)
-		draw.text((80,30), txttowrt, font=font)
+		draw.text((70,52), txttowrt, font=font)
 		txttowrt = "Rating: %s %s" % (self.steamrating, self.__steamRatingConvert(float(self.steamrating)))
-		draw.text((80,40), txttowrt, font=font)
+		draw.text((70,62), txttowrt, font=font)
 		txttowrt = "Played: %s hrs past 2 weeks" % (self.hoursplayed2wk)
-		draw.text((80,50), txttowrt, font=font)
+		draw.text((70,72), txttowrt, font=font)
 		
 		try:
-			avatarIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.avatarURL).read()))
-			image.paste(avatarIM, (10,20))
+			avatarIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.avatarURL).read())).resize((55,55), Image.ANTIALIAS)
+			image.paste(avatarIM, (10,35))
 		except:
 			pass
 		
 		if self.primarygroup:
 			try:
-				groupIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.primarygroup['icon']).read())).resize((20, 20))
-				image.paste(groupIM, (10,0))
+				groupIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+				image.paste(groupIM, (10,5))
 			except:
 				pass
 			txttowrt = "\"%s\" Member" % (self.primarygroup['name'])
-			draw.text((10, 80), txttowrt, font=font)
+			draw.text((10, 90), txttowrt, font=font)
+			draw.text((35,7), self.steamcustomurl, font=fontlarge)
+		else:
+			draw.text((10,7), self.steamcustomurl, font=fontlarge)
 			
 		if len(self.topGamesPlayed) > 0:
 			try:
 				firstgameIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.topGamesPlayed[0]['icon']).read()))
-				image.paste(firstgameIM, (10,100))
+				image.paste(firstgameIM, (10,112))
 			except:
 				pass
-			draw.text((50, 100), self.topGamesPlayed[0]['name'], font=font)
+			draw.text((45, 112), self.topGamesPlayed[0]['name'], font=font)
 			txttowrt = "%s hours" % (self.topGamesPlayed[0]['hoursplayed'])
-			draw.text((50,110), txttowrt, font=font)
-			xoffset = 160
+			draw.text((45,122), txttowrt, font=font)
+			xoffset = 168
 			for i in range(1,len(self.topGamesPlayed)):
 				try:
 					gameIcon = Image.open(cStringIO.StringIO(urllib2.urlopen(self.topGamesPlayed[i]['icon']).read()))
-					image.paste(gameIcon, (xoffset,100))
+					image.paste(gameIcon, (xoffset,112))
 				except:
 					pass
-				xoffset = xoffset - 40
+				xoffset = xoffset - 35
 
 		return image
 	
@@ -216,9 +220,8 @@ class SteamProfileCard:
 		"""
 		image = Image.new("RGB", (210,150))
 		draw = ImageDraw.Draw(image)
-		font = ImageFont.truetype("c:\FreeMonoBold.ttf", 10, encoding="unic")
 		draw.text((10,20), "The Steam profile for custom URL: ", font=font)
-		draw.text((20,30), self.steamcustomurl, font=font)
+		draw.text((20,30), self.steamuserid, font=font)
 		draw.text((10,40), error, font=font)
 		return image
 	
