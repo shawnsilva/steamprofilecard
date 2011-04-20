@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 0.1.1
+# Version: 0.1.2
 # By: Shawn Silva (shawn at jatgam dot com)
 # 
 # Created: 04/06/2011
-# Modified: 04/11/2011
+# Modified: 04/20/2011
 # 
 # Using the Steam Web API this script will make a "gamer card" of a
 # given Steam Profile and return a PNG image.
@@ -48,19 +48,26 @@
 #   behind the steam information.
 # - Handle a "sig" type for thin bands to use in forum signatures
 #   as opposed to the larger "card" type.
+# - Long game name need to be truncated in some fashion.
+# - Optional Image chache to reduce server load?
 # 
 # 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                             CHANGELOG                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# 04/11/2011		v0.1.1 - Changed resize filter for to improve
+# 04/20/2011        v0.1.2 - Added Online status indicator.
+# 04/11/2011        v0.1.1 - Changed resize filter for to improve
 #                            quality. Set final alignment for data.
-# 04/06/2011		v0.1.0 - Initial script creation.
+# 04/06/2011        v0.1.0 - Initial script creation.
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 import urllib2, cStringIO, re
 import xml.etree.ElementTree as ET
 import ImageFont, ImageDraw
 from PIL import Image
+
+# CACHE_ENABLED = False			#Image cache to reduce server load.
+# CACHE_DURATION = 60			#Time in minutes images are chached for
+# CACHE_PATH = "/path/to/cache"	#Path to the folders to store the cahced images.
 
 fontlarge = ImageFont.truetype("c:\FreeSansBold.ttf", 12, encoding="unic")
 font = ImageFont.truetype("c:\FreeSansBold.ttf", 8, encoding="unic")
@@ -159,6 +166,17 @@ class SteamProfileCard:
 		else:
 			return "N/A"
 
+	def __onlineStateDraw(self, color):
+		"""
+		Draws a circle and returns a PIL image 5x5 with the color specified. This is to
+		draw a nice smooth circle since PIL can't do it by default.
+		"""
+		image = Image.new("RGBA", (100,100), color=(255, 255, 255, 0))
+		draw = ImageDraw.Draw(image)
+		draw.ellipse((0, 0, 100, 100), fill=color, outline="#000000")
+		state = image.resize((5,5), Image.ANTIALIAS)
+		return state
+	
 	def __publicProfileCardDraw(self):
 		"""
 		Draws a new image with PIL based on Steam User Info. Returns a PIL image object.
@@ -167,13 +185,20 @@ class SteamProfileCard:
 		draw = ImageDraw.Draw(image)
 		
 		
-		draw.text((70,35), self.id, font=fontlarge)
+		draw.text((78,35), self.id, font=fontlarge)
 		txttowrt = "Joined: %s"  % (self.membersince)
 		draw.text((70,52), txttowrt, font=font)
 		txttowrt = "Rating: %s %s" % (self.steamrating, self.__steamRatingConvert(float(self.steamrating)))
 		draw.text((70,62), txttowrt, font=font)
 		txttowrt = "Played: %s hrs past 2 weeks" % (self.hoursplayed2wk)
 		draw.text((70,72), txttowrt, font=font)
+		
+		if self.status == "online" or self.status == "in-game":
+			statusimage = self.__onlineStateDraw("#00FF00")
+		else:
+			statusimage = self.__onlineStateDraw("#FF0000")
+		image.paste(statusimage, (70, 40), statusimage)
+		
 		
 		try:
 			avatarIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.avatarURL).read())).resize((55,55), Image.ANTIALIAS)
