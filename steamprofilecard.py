@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 0.1.2
+# Version: 0.1.3
 # By: Shawn Silva (shawn at jatgam dot com)
 # 
 # Created: 04/06/2011
-# Modified: 04/20/2011
+# Modified: 04/21/2011
 # 
 # Using the Steam Web API this script will make a "gamer card" of a
 # given Steam Profile and return a PNG image.
@@ -44,33 +44,39 @@
 #                               TODO                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # - Change the way fonts are designated to be easily modified.
-# - Implement background templates so the image isn't solid black
-#   behind the steam information.
 # - Handle a "sig" type for thin bands to use in forum signatures
 #   as opposed to the larger "card" type.
-# - Long game name need to be truncated in some fashion.
+# - Long game name needs to be truncated in some fashion.
 # - Optional Image chache to reduce server load?
 # 
 # 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                             CHANGELOG                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# 04/21/2011        v0.1.3 - Base templates implemented so background
+#                            isn't a solid color.
 # 04/20/2011        v0.1.2 - Added Online status indicator.
-# 04/11/2011        v0.1.1 - Changed resize filter for to improve
-#                            quality. Set final alignment for data.
+# 04/11/2011        v0.1.1 - Changed resize filter to improve quality.
+#                            Set final alignment for data.
 # 04/06/2011        v0.1.0 - Initial script creation.
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-import urllib2, cStringIO, re
+import urllib2, cStringIO, re, os, sys
 import xml.etree.ElementTree as ET
 import ImageFont, ImageDraw
 from PIL import Image
+
+TEMPLATE_PATH = os.path.join(sys.path[0], "templates")
+#TEMPLATE_PATH = "/path/to/templates"
+
+FONT_PATH = os.path.join(sys.path[0], "fonts")
+#FONT_PATH = "/path/to/fonts"
 
 # CACHE_ENABLED = False			#Image cache to reduce server load.
 # CACHE_DURATION = 60			#Time in minutes images are chached for
 # CACHE_PATH = "/path/to/cache"	#Path to the folders to store the cahced images.
 
-fontlarge = ImageFont.truetype("c:\FreeSansBold.ttf", 12, encoding="unic")
-font = ImageFont.truetype("c:\FreeSansBold.ttf", 8, encoding="unic")
+fontlarge = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 12, encoding="unic")
+font = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 8, encoding="unic")
 
 class SteamProfileCard:
 	def __init__(self, steamuserid, imgtype, template):
@@ -177,11 +183,29 @@ class SteamProfileCard:
 		state = image.resize((5,5), Image.ANTIALIAS)
 		return state
 	
+	def __loadBaseTemplateCard(self, template):
+		"""
+		Will load the base template for the profile card based on input. If the
+		template can't be found a blank image will be used. Returns a PIL image object.
+		"""
+		imageloaded = False
+		templatefile = os.path.join(TEMPLATE_PATH, template + ".png")
+		if os.path.isfile(templatefile):
+			try:
+				image = Image.open(templatefile).convert("RGB")
+				if image.size == (210, 150):
+					imageloaded = True
+			except:
+				pass
+		if imageloaded == False:
+			image = Image.new("RGB", (210,150), color="#808080")
+		return image
+	
 	def __publicProfileCardDraw(self):
 		"""
 		Draws a new image with PIL based on Steam User Info. Returns a PIL image object.
 		"""
-		image = Image.new("RGB", (210,150), color="#808080")
+		image = self.__loadBaseTemplateCard(self.template)
 		draw = ImageDraw.Draw(image)
 		
 		
@@ -279,7 +303,7 @@ class SteamProfileCard:
 		return self.imgStream.read()
 
 def main():
-	card = SteamProfileCard("sinkigobopo", "card", "template")
+	card = SteamProfileCard("sinkigobopo", "card", "default")
 	
 	
 	profileImg = card.drawProfileImg()
