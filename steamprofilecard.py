@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 0.1.3
+# Version: 0.1.4
 # By: Shawn Silva (shawn at jatgam dot com)
 # 
 # Created: 04/06/2011
-# Modified: 04/21/2011
+# Modified: 04/26/2011
 # 
 # Using the Steam Web API this script will make a "gamer card" of a
 # given Steam Profile and return a PNG image.
@@ -43,16 +43,15 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 #                               TODO                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# - Change the way fonts are designated to be easily modified.
 # - Handle a "sig" type for thin bands to use in forum signatures
 #   as opposed to the larger "card" type.
-# - Long game name needs to be truncated in some fashion.
-# - Optional Image chache to reduce server load?
+# - Optional Image cache to reduce server load?
 # 
 # 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                             CHANGELOG                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# 04/26/2011        v0.1.4 - Truncated long game names.
 # 04/21/2011        v0.1.3 - Base templates implemented so background
 #                            isn't a solid color.
 # 04/20/2011        v0.1.2 - Added Online status indicator.
@@ -189,7 +188,7 @@ class SteamProfileCard:
 		template can't be found a blank image will be used. Returns a PIL image object.
 		"""
 		imageloaded = False
-		templatefile = os.path.join(TEMPLATE_PATH, template + ".png")
+		templatefile = os.path.join(TEMPLATE_PATH, "card", template + ".png")
 		if os.path.isfile(templatefile):
 			try:
 				image = Image.open(templatefile).convert("RGB")
@@ -248,7 +247,8 @@ class SteamProfileCard:
 				image.paste(firstgameIM, (10,112))
 			except:
 				pass
-			draw.text((45, 112), self.topGamesPlayed[0]['name'], font=font)
+			txttowrt = (self.topGamesPlayed[0]['name'][:22] + "...") if len(self.topGamesPlayed[0]['name']) > 22 else self.topGamesPlayed[0]['name']
+			draw.text((45, 112), txttowrt, font=font)
 			txttowrt = "%s hours" % (self.topGamesPlayed[0]['hoursplayed'])
 			draw.text((45,122), txttowrt, font=font)
 			xoffset = 168
@@ -310,11 +310,7 @@ def main():
 	
 	
 	profileImg.show()
-	#imgStream = cStringIO.StringIO()
-	#profileImg.save(imgStream, "PNG")
-	#print "Content-type: image/png\n"
-	#imgStream.seek(0)
-	#print imgStream.read()
+
 
 if __name__ == "__main__":
 	main()
