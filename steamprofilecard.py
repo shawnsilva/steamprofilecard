@@ -22,7 +22,7 @@
 #          card = profile.drawProfileCard()
 #
 #          card.save("/path/to/save/image.png", "PNG")
-#    OR    pngimg = profile.imageToFile()
+#    OR    pngimg = profile.imageToWeb()
 #
 # SteamProfileCard(id, type, template) creates the profile object.
 # The "id" is your Steam ID or your Steam Custom URL. The "type"
