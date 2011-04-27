@@ -1,29 +1,50 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 0.1.4
+# Version: 1.0.0
 # By: Shawn Silva (shawn at jatgam dot com)
 # 
 # Created: 04/06/2011
-# Modified: 04/26/2011
+# Modified: 04/27/2011
 # 
 # Using the Steam Web API this script will make a "gamer card" of a
 # given Steam Profile and return a PNG image.
 # -----------------------------------------------------------------
 # This script will take the users steam url/id and use it to gather
 # their profile information. The info is then turned into an image
-# in the style of a "gamer card". This can then be returned to output
-# as an image file on a webpage.
+# in the style of a "gamer card" or signature image for using in forums. 
+# This can then be returned to output as an image file on a webpage or
+# saved to disk.
 #
-# Example: profile = SteamProfileCard("customURLorID", "card", "template")
+# HOW TO USE: 
+#          from steamprofilecard import SteamProfileCard
+#          profile = SteamProfileCard("customURLorID", "card", "template")
 #          card = profile.drawProfileCard()
-#          pngimg = profile.imageToFile()
+#
+#          card.save("/path/to/save/image.png", "PNG")
+#    OR    pngimg = profile.imageToFile()
+#
+# SteamProfileCard(id, type, template) creates the profile object.
+# The "id" is your Steam ID or your Steam Custom URL. The "type"
+# determines if a gamer card or signature will be drawn. The "type"
+# must be either "card" or "sig". If it is set to an invalid type
+# a default of "card" will be used. The "template" is the filename 
+# of the background template to the image without the file extension.
 #
 # drawProfileCard() will return a Python Imaging Library (PIL) image 
-# object that can be further modified if desired. Otherwise, 
-# imageToFile() will save the image to a PNG format that can be 
-# easily output on a website.
+# object that can be further modified if desired. Using the PIL 
+# Image.save(path, format) will allow you to save the image to disk.
+#
+# Otherwise, imageToWeb() will return the image to a PNG format that 
+# can be easily output on a website. It should only be used after 
+# drawProfileCard() has been run. The returned data can be sent to 
+# a web browser with the Content Type set to image/png. This allows
+# the script to be called as an image allowing dynamic profile status
+# to be displayed.
 # 
+# REQUIREMENTS:
+# Python 2.7.x
+# Python Imaging Library (PIL) 1.1.7 with libfreetype support.
 # 
 # Copyright (C) 2011  Shawn Silva
 # -------------------------------
@@ -43,14 +64,14 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 #                               TODO                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# - Handle a "sig" type for thin bands to use in forum signatures
-#   as opposed to the larger "card" type.
 # - Optional Image cache to reduce server load?
 # 
 # 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                             CHANGELOG                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# 04/27/2001        v1.0.0 - Now handles "sig" type cards. All major
+#                            features originally intended are included.
 # 04/26/2011        v0.1.4 - Truncated long game names.
 # 04/21/2011        v0.1.3 - Base templates implemented so background
 #                            isn't a solid color.
@@ -64,11 +85,17 @@ import xml.etree.ElementTree as ET
 import ImageFont, ImageDraw
 from PIL import Image
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                      VARIABLES TO MODIFY                        #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 TEMPLATE_PATH = os.path.join(sys.path[0], "templates")
 #TEMPLATE_PATH = "/path/to/templates"
 
 FONT_PATH = os.path.join(sys.path[0], "fonts")
 #FONT_PATH = "/path/to/fonts"
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                  END OF VARIABLES TO MODIFY                     #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # CACHE_ENABLED = False			#Image cache to reduce server load.
 # CACHE_DURATION = 60			#Time in minutes images are chached for
@@ -80,7 +107,7 @@ font = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 8, encodi
 class SteamProfileCard:
 	def __init__(self, steamuserid, imgtype, template):
 		self.steamuserid = steamuserid
-		self.imgtype = imgtype
+		self.imgtype = self.__profileImgType(imgtype)
 		self.template = template
 		self.steampuburl = self.__steamURLType(self.steamuserid)
 		self.__steamPublicXMLParse(self.steampuburl)
@@ -95,6 +122,22 @@ class SteamProfileCard:
 		else:
 			url = "http://steamcommunity.com/id/%s/?xml=1" % (userid)
 		return url
+	
+	def __profileImgType(self, imgtype):
+		"""
+		Will make sure the imgtype is either "card" or "sig". Will default to "card" if not.
+		Returns the type.
+		"""
+		if imgtype == "card":
+			self.imgsize = (210, 150)
+			return imgtype
+		elif imgtype == "sig":
+			self.imgsize = (350, 50)
+			return imgtype
+		else:
+			imgtype = "card"
+			self.imgsize = (210, 150)
+			return imgtype
 	
 	def __steamPublicXMLParse(self, url):
 		"""
@@ -182,29 +225,30 @@ class SteamProfileCard:
 		state = image.resize((5,5), Image.ANTIALIAS)
 		return state
 	
-	def __loadBaseTemplateCard(self, template):
+	def __loadBaseTemplateImg(self, template):
 		"""
 		Will load the base template for the profile card based on input. If the
-		template can't be found a blank image will be used. Returns a PIL image object.
+		template can't be found a blank image will be used. If the type of card isn't
+		valid (card|sig) the "card" type will be used. Returns a PIL image object.
 		"""
 		imageloaded = False
-		templatefile = os.path.join(TEMPLATE_PATH, "card", template + ".png")
+		templatefile = os.path.join(TEMPLATE_PATH, self.imgtype, template + ".png")
 		if os.path.isfile(templatefile):
 			try:
 				image = Image.open(templatefile).convert("RGB")
-				if image.size == (210, 150):
+				if image.size == self.imgsize:
 					imageloaded = True
 			except:
 				pass
 		if imageloaded == False:
-			image = Image.new("RGB", (210,150), color="#808080")
+			image = Image.new("RGB", self.imgsize, color="#808080")
 		return image
-	
+		
 	def __publicProfileCardDraw(self):
 		"""
-		Draws a new image with PIL based on Steam User Info. Returns a PIL image object.
+		Draws a new profile "card" type with PIL based on Steam User Info. Returns a PIL image object.
 		"""
-		image = self.__loadBaseTemplateCard(self.template)
+		image = self.__loadBaseTemplateImg(self.template)
 		draw = ImageDraw.Draw(image)
 		
 		
@@ -256,10 +300,60 @@ class SteamProfileCard:
 				try:
 					gameIcon = Image.open(cStringIO.StringIO(urllib2.urlopen(self.topGamesPlayed[i]['icon']).read()))
 					image.paste(gameIcon, (xoffset,112))
+					xoffset = xoffset - 35
 				except:
 					pass
-				xoffset = xoffset - 35
+				
 
+		return image
+	
+	def __publicProfileSigDraw(self):
+		"""
+		Draws a new profile "sig" type with PIL based on Steam User Info. Returns a PIL image object.
+		"""
+		image = self.__loadBaseTemplateImg(self.template)
+		draw = ImageDraw.Draw(image)
+		
+		try:
+			avatarIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.avatarURL).read())).resize((40,40), Image.ANTIALIAS)
+			image.paste(avatarIM, (5,5))
+		except:
+			pass
+		
+		if self.status == "online" or self.status == "in-game":
+			statusimage = self.__onlineStateDraw("#00FF00")
+		else:
+			statusimage = self.__onlineStateDraw("#FF0000")
+		
+		
+		if self.primarygroup:
+			try:
+				groupIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+				image.paste(groupIM, (57,2))
+			except:
+				pass
+			image.paste(statusimage, (82, 9), statusimage)
+			draw.text((90,4), self.id, font=fontlarge)
+		else:
+			image.paste(statusimage, (57, 9), statusimage)
+			draw.text((65,4), self.id, font=fontlarge)
+		
+		txttowrt = "Rating: %s %s" % (self.steamrating, self.__steamRatingConvert(float(self.steamrating)))
+		draw.text((57,35), txttowrt, font=font)
+		
+		txttowrt = "Played: %s hrs past 2 weeks" % (self.hoursplayed2wk)
+		draw.text((57,25), txttowrt, font=font)
+
+		xoffset = 325
+		for game in reversed(self.topGamesPlayed):
+			try:
+				gameIcon = Image.open(cStringIO.StringIO(urllib2.urlopen(game['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+				image.paste(gameIcon, (xoffset,25))
+				xoffset = xoffset - 25
+			except:
+				pass
+			
+		
 		return image
 	
 	def __profileErrorDraw(self, error):
@@ -267,30 +361,33 @@ class SteamProfileCard:
 		If there was an error retrieving Steam user info this will draw an image to report the error.
 		Returns a PIL image object.
 		"""
-		image = Image.new("RGB", (210,150))
+		image = Image.new("RGB", self.imgsize)
 		draw = ImageDraw.Draw(image)
-		draw.text((10,20), "The Steam profile for custom URL: ", font=font)
-		draw.text((20,30), self.steamuserid, font=font)
-		draw.text((10,40), error, font=font)
+		draw.text((10,10), "The Steam profile for custom URL: ", font=font)
+		draw.text((20,20), self.steamuserid, font=font)
+		draw.text((10,30), error, font=font)
 		return image
 	
 	def drawProfileImg(self):
 		"""
 		After the class is initialized this function can be called to draw an image. If any errors
-		were found in obtaining user info it will draw an error image, otherwise a profile card is generated.
+		were found in obtaining user info it will draw an error image, otherwise a profile card|sig is generated.
 		Returns a PIL image object.
 		"""
 		if self.profileGrabStatus == False:
 			self.profileImage = self.__profileErrorDraw("had an error retrieving xml")
 		elif self.privacystate == "public":
-			self.profileImage = self.__publicProfileCardDraw()
+			if self.imgtype == "card":
+				self.profileImage = self.__publicProfileCardDraw()
+			elif self.imgtype == "sig":
+				self.profileImage = self.__publicProfileSigDraw()
 		elif self.id:
 			self.profileImage = self.__profileErrorDraw("is not public.")
 		else:
 			self.profileImage = self.__profileErrorDraw("doesn't exist.")
 		return self.profileImage
 	
-	def imageToFile(self):
+	def imageToWeb(self):
 		"""
 		Will attempt to save the generated PIL image object as a PNG stream so it can be include in web output.
 		"""
