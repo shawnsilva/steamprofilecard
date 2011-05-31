@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 1.0.0
+# Version: 1.0.1
 # By: Shawn Silva (shawn at jatgam dot com)
 # 
 # Created: 04/06/2011
@@ -70,7 +70,8 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                             CHANGELOG                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# 04/27/2001        v1.0.0 - Now handles "sig" type cards. All major
+# 05/31/2011        v1.0.1 - Fixed Game Icon order on Card type.
+# 04/27/2011        v1.0.0 - Now handles "sig" type cards. All major
 #                            features originally intended are included.
 # 04/26/2011        v0.1.4 - Truncated long game names.
 # 04/21/2011        v0.1.3 - Base templates implemented so background
@@ -295,12 +296,12 @@ class SteamProfileCard:
 			draw.text((45, 112), txttowrt, font=font)
 			txttowrt = "%s hours" % (self.topGamesPlayed[0]['hoursplayed'])
 			draw.text((45,122), txttowrt, font=font)
-			xoffset = 168
+			xoffset = 133
 			for i in range(1,len(self.topGamesPlayed)):
 				try:
 					gameIcon = Image.open(cStringIO.StringIO(urllib2.urlopen(self.topGamesPlayed[i]['icon']).read()))
 					image.paste(gameIcon, (xoffset,112))
-					xoffset = xoffset - 35
+					xoffset = xoffset + 35
 				except:
 					pass
 				
