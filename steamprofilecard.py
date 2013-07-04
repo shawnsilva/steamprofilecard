@@ -1,52 +1,13 @@
 #!/usr/bin/python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # steamprofilecard.py
-# Version: 1.0.1
-# By: Shawn Silva (shawn at jatgam dot com)
+# Version: 1.0.2
+# By: Shawn Silva (ssilva at jatgam dot com)
 # 
 # Created: 04/06/2011
-# Modified: 04/27/2011
+# Modified: 07/03/2013
 # 
-# Using the Steam Web API this script will make a "gamer card" of a
-# given Steam Profile and return a PNG image.
-# -----------------------------------------------------------------
-# This script will take the users steam url/id and use it to gather
-# their profile information. The info is then turned into an image
-# in the style of a "gamer card" or signature image for using in forums. 
-# This can then be returned to output as an image file on a webpage or
-# saved to disk.
-#
-# HOW TO USE: 
-#          from steamprofilecard import SteamProfileCard
-#          profile = SteamProfileCard("customURLorID", "card", "template")
-#          card = profile.drawProfileCard()
-#
-#          card.save("/path/to/save/image.png", "PNG")
-#    OR    pngimg = profile.imageToWeb()
-#
-# SteamProfileCard(id, type, template) creates the profile object.
-# The "id" is your Steam ID or your Steam Custom URL. The "type"
-# determines if a gamer card or signature will be drawn. The "type"
-# must be either "card" or "sig". If it is set to an invalid type
-# a default of "card" will be used. The "template" is the filename 
-# of the background template to the image without the file extension.
-#
-# drawProfileCard() will return a Python Imaging Library (PIL) image 
-# object that can be further modified if desired. Using the PIL 
-# Image.save(path, format) will allow you to save the image to disk.
-#
-# Otherwise, imageToWeb() will return the image to a PNG format that 
-# can be easily output on a website. It should only be used after 
-# drawProfileCard() has been run. The returned data can be sent to 
-# a web browser with the Content Type set to image/png. This allows
-# the script to be called as an image allowing dynamic profile status
-# to be displayed.
-# 
-# REQUIREMENTS:
-# Python 2.7.x
-# Python Imaging Library (PIL) 1.1.7 with libfreetype support.
-# 
-# Copyright (C) 2011  Shawn Silva
+# Copyright (C) 2011-2013  Shawn Silva
 # -------------------------------
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -60,31 +21,25 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-#                               TODO                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# - Optional Image cache to reduce server load?
-# 
-# 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#                             CHANGELOG                           #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# 05/31/2011        v1.0.1 - Fixed Game Icon order on Card type.
-# 04/27/2011        v1.0.0 - Now handles "sig" type cards. All major
-#                            features originally intended are included.
-# 04/26/2011        v0.1.4 - Truncated long game names.
-# 04/21/2011        v0.1.3 - Base templates implemented so background
-#                            isn't a solid color.
-# 04/20/2011        v0.1.2 - Added Online status indicator.
-# 04/11/2011        v0.1.1 - Changed resize filter to improve quality.
-#                            Set final alignment for data.
-# 04/06/2011        v0.1.0 - Initial script creation.
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-import urllib2, cStringIO, re, os, sys
+import sys
+
+PYMAJORVER, PYMINORVER, PYMICROVER, PYRELEASELEVEL, PYSERIAL = sys.version_info
+if PYMAJORVER == 3 and PYMINORVER >= 2:
+    #Python >= 3.2
+    from urllib.request import urlopen
+elif PYMAJORVER == 2 and PYMINORVER == 7:
+    #Python 2.7
+    from urllib2 import urlopen
+elif PYMAJORVER == 2 and PYMINORVER == 6:
+    #Python 2.6
+    from urllib2 import urlopen
+else:
+    raise PythonVersionError("Python Version 2.6 or greater required.")
+
+import io, re, os
 import xml.etree.ElementTree as ET
-import ImageFont, ImageDraw
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                      VARIABLES TO MODIFY                        #
@@ -146,7 +101,7 @@ class SteamProfileCard:
         Sets variables for Steam profile information.
         """
         try:
-            pubtree = ET.parse(urllib2.urlopen(url))
+            pubtree = ET.parse(urlopen(url))
             self.profileGrabStatus = True
         except:
             self.profileGrabStatus = False
@@ -160,8 +115,13 @@ class SteamProfileCard:
         self.membersince = pubtree.findtext("memberSince")
         self.steamrating = pubtree.findtext("steamRating")
         self.hoursplayed2wk = pubtree.findtext("hoursPlayed2Wk")
-        self.topGamesPlayed = self.__gamesPlayedParse(list(pubtree.iter("mostPlayedGame")))
-        self.primarygroup = self.__primaryGroupParse(list(pubtree.iter("group")))
+        if (PYMAJORVER,PYMINORVER) == (2,6):
+            #Element.iter() doesn't exist in Python 2.6
+            self.topGamesPlayed = self.__gamesPlayedParse(list(pubtree.getiterator("mostPlayedGame")))
+            self.primarygroup = self.__primaryGroupParse(list(pubtree.getiterator("group")))
+        else:
+            self.topGamesPlayed = self.__gamesPlayedParse(list(pubtree.iter("mostPlayedGame")))
+            self.primarygroup = self.__primaryGroupParse(list(pubtree.iter("group")))
         return
 
     def __gamesPlayedParse(self, gamelist):
@@ -269,14 +229,14 @@ class SteamProfileCard:
         
         
         try:
-            avatarIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.avatarURL).read())).resize((55,55), Image.ANTIALIAS)
+            avatarIM = Image.open(io.BytesIO(urlopen(self.avatarURL).read())).resize((55,55), Image.ANTIALIAS)
             image.paste(avatarIM, (10,35))
         except:
             pass
         
         if self.primarygroup:
             try:
-                groupIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+                groupIM = Image.open(io.BytesIO(urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
                 image.paste(groupIM, (10,5))
             except:
                 pass
@@ -288,7 +248,7 @@ class SteamProfileCard:
             
         if len(self.topGamesPlayed) > 0:
             try:
-                firstgameIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.topGamesPlayed[0]['icon']).read()))
+                firstgameIM = Image.open(io.BytesIO(urlopen(self.topGamesPlayed[0]['icon']).read()))
                 image.paste(firstgameIM, (10,112))
             except:
                 pass
@@ -299,7 +259,7 @@ class SteamProfileCard:
             xoffset = 133
             for i in range(1,len(self.topGamesPlayed)):
                 try:
-                    gameIcon = Image.open(cStringIO.StringIO(urllib2.urlopen(self.topGamesPlayed[i]['icon']).read()))
+                    gameIcon = Image.open(io.BytesIO(urlopen(self.topGamesPlayed[i]['icon']).read()))
                     image.paste(gameIcon, (xoffset,112))
                     xoffset = xoffset + 35
                 except:
@@ -316,7 +276,7 @@ class SteamProfileCard:
         draw = ImageDraw.Draw(image)
         
         try:
-            avatarIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.avatarURL).read())).resize((40,40), Image.ANTIALIAS)
+            avatarIM = Image.open(io.BytesIO(urlopen(self.avatarURL).read())).resize((40,40), Image.ANTIALIAS)
             image.paste(avatarIM, (5,5))
         except:
             pass
@@ -329,7 +289,7 @@ class SteamProfileCard:
         
         if self.primarygroup:
             try:
-                groupIM = Image.open(cStringIO.StringIO(urllib2.urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+                groupIM = Image.open(io.BytesIO(urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
                 image.paste(groupIM, (57,2))
             except:
                 pass
@@ -348,7 +308,7 @@ class SteamProfileCard:
         xoffset = 325
         for game in reversed(self.topGamesPlayed):
             try:
-                gameIcon = Image.open(cStringIO.StringIO(urllib2.urlopen(game['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+                gameIcon = Image.open(io.BytesIO(urlopen(game['icon']).read())).resize((20, 20), Image.ANTIALIAS)
                 image.paste(gameIcon, (xoffset,25))
                 xoffset = xoffset - 25
             except:
@@ -392,7 +352,7 @@ class SteamProfileCard:
         """
         Will attempt to save the generated PIL image object as a PNG stream so it can be include in web output.
         """
-        self.imgStream = cStringIO.StringIO()
+        self.imgStream = io.BytesIO()
         try:
             self.profileImage.save(self.imgStream, "PNG")
         except:
