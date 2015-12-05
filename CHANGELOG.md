@@ -1,5 +1,8 @@
 #Change Log
 
+### December 05, 2015 - v1.0.3
+* Removed all internal processing of Steam user/group information and now use 'steamwebapi'.
+
 ### June 03, 2013 - v1.0.2
 * Added support for Python 3 and switched from PIL to Pillow.
 

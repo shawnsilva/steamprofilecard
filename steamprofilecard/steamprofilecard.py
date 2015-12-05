@@ -1,15 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# steamprofilecard.py
-# Version: 1.0.2
-# By: Shawn Silva (ssilva at jatgam dot com)
-# 
-# Created: 04/06/2011
-# Modified: 07/03/2013
-# 
-# Copyright (C) 2011-2013  Shawn Silva
-# -------------------------------
-# This program is free software: you can redistribute it and/or modify
+# Copyright (C) 2011-2015  Shawn Silva
+# ------------------------------------
+# This file is part of SteamProfileCard
+#
+# SteamProfileCard is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
@@ -35,27 +30,30 @@ elif PYMAJORVER == 2 and PYMINORVER == 6:
     #Python 2.6
     from urllib2 import urlopen
 else:
-    raise PythonVersionError("Python Version 2.6 or greater required.")
+    raise RuntimeError("Python Version 2.6 or greater required.")
 
 import io, re, os
+from datetime import datetime
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageFont, ImageDraw
+
+from steamwebapi import profiles
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                      VARIABLES TO MODIFY                        #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-TEMPLATE_PATH = os.path.join(sys.path[0], "templates")
+TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 #TEMPLATE_PATH = "/path/to/templates"
 
-FONT_PATH = os.path.join(sys.path[0], "fonts")
+FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
 #FONT_PATH = "/path/to/fonts"
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                  END OF VARIABLES TO MODIFY                     #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # CACHE_ENABLED = False            #Image cache to reduce server load.
-# CACHE_DURATION = 60            #Time in minutes images are chached for
-# CACHE_PATH = "/path/to/cache"    #Path to the folders to store the cahced images.
+# CACHE_DURATION = 60            #Time in minutes images are cached for
+# CACHE_PATH = "/path/to/cache"    #Path to the folders to store the cached images.
 
 fontlarge = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 12, encoding="unic")
 font = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 8, encoding="unic")
@@ -65,19 +63,22 @@ class SteamProfileCard:
         self.steamuserid = steamuserid
         self.imgtype = self.__profileImgType(imgtype)
         self.template = template
-        self.steampuburl = self.__steamURLType(self.steamuserid)
-        self.__steamPublicXMLParse(self.steampuburl)
+        self.profileGrabStatus = True
+        try:
+            self.user_profile = profiles.get_user_profile(steamuserid)
+            if self.user_profile.primaryclanid:
+                self.primary_group_profile = profiles.get_group_profile(self.user_profile.primaryclanid)
+            else:
+                self.primary_group_profile = None
+        except:
+            self.profileGrabStatus = False
 
-    def __steamURLType(self, userid):
-        """
-        Checks the userid input to see if it is a custom url or steam ID. Returns the corresponding URL string.
-        """
-        regex = re.compile('^\d{17}$')
-        if regex.match(userid):
-            url = "http://steamcommunity.com/profiles/%s/?xml=1" % (userid)
-        else:
-            url = "http://steamcommunity.com/id/%s/?xml=1" % (userid)
-        return url
+    def __get_2wk_playtime(self):
+        games = self.user_profile.recentlyplayedgames
+        minutes = 0
+        for game in games:
+            minutes += game['playtime_2weeks']
+        return ((minutes + 60 // 2) // 60)
     
     def __profileImgType(self, imgtype):
         """
@@ -94,86 +95,6 @@ class SteamProfileCard:
             imgtype = "card"
             self.imgsize = (210, 150)
             return imgtype
-    
-    def __steamPublicXMLParse(self, url):
-        """
-        Takes a URL input for Steam Community Profile in XML format. ex: http://steamcommunity.com/id/CustomUrl/?xml=1
-        Sets variables for Steam profile information.
-        """
-        try:
-            pubtree = ET.parse(urlopen(url))
-            self.profileGrabStatus = True
-        except:
-            self.profileGrabStatus = False
-            return
-        self.id64 = pubtree.findtext("steamID64")
-        self.id = pubtree.findtext("steamID")
-        self.steamcustomurl = pubtree.findtext("customURL")
-        self.privacystate = pubtree.findtext("privacyState")
-        self.status = pubtree.findtext("onlineState")
-        self.avatarURL = pubtree.findtext("avatarMedium")
-        self.membersince = pubtree.findtext("memberSince")
-        self.steamrating = pubtree.findtext("steamRating")
-        self.hoursplayed2wk = pubtree.findtext("hoursPlayed2Wk")
-        if (PYMAJORVER,PYMINORVER) == (2,6):
-            #Element.iter() doesn't exist in Python 2.6
-            self.topGamesPlayed = self.__gamesPlayedParse(list(pubtree.getiterator("mostPlayedGame")))
-            self.primarygroup = self.__primaryGroupParse(list(pubtree.getiterator("group")))
-        else:
-            self.topGamesPlayed = self.__gamesPlayedParse(list(pubtree.iter("mostPlayedGame")))
-            self.primarygroup = self.__primaryGroupParse(list(pubtree.iter("group")))
-        return
-
-    def __gamesPlayedParse(self, gamelist):
-        """
-        Takes a XML object containing a list of games played recently. Returns a list with dictionaires
-        for each individual game containing the name, link, icon, hoursplayed, and hoursonrecord.
-        """
-        gamesPlayed = []
-        for game in gamelist:
-            a = {'name': game.findtext("gameName"), 'link': game.findtext("gameLink"), 'icon': game.findtext("gameIcon"), 'hoursplayed': game.findtext("hoursPlayed"), 'hoursonrecord': game.findtext("hoursOnRecord")}
-            gamesPlayed.append(a)
-        return gamesPlayed
-
-    def __primaryGroupParse(self, grouplist):
-        """
-        Takes a XML object with a list of groups and returns a dictionary of the primary group containing
-        the name and icon URL.
-        """
-        for group in grouplist:
-            if group.attrib["isPrimary"] == "1":
-                primarygroup = {'name': group.findtext("groupName"), 'icon': group.findtext("avatarIcon")}
-                return primarygroup
-        return False
-
-    def __steamRatingConvert(self, rating):
-        """
-        Takes a number input 0.0 - 10.0 and returns a string representing the Steam rating level.
-        """
-        if rating >= 0 and rating < 1:
-            return "Teh Suck"
-        elif rating >= 1 and rating < 2:
-            return "El Terrible!"
-        elif rating >= 2 and rating < 3:
-            return "Nearly Lifeless"
-        elif rating >= 3 and rating < 4:
-            return "Shooting Blanks"
-        elif rating >= 4 and rating < 5:
-            return "Master of Nothing"
-        elif rating >= 5 and rating < 6:
-            return "Halfway Cool"
-        elif rating >= 6 and rating < 7:
-            return "Oooh! Shiny!"
-        elif rating >= 7 and rating < 8:
-            return "Wax on, Wax off"
-        elif rating >= 8 and rating < 9:
-            return "COBRA KAI!"
-        elif rating >= 9 and rating < 10:
-            return "Still not 10"
-        elif rating == 10:
-            return "EAGLES SCREAM!"
-        else:
-            return "N/A"
 
     def __onlineStateDraw(self, color):
         """
@@ -213,15 +134,15 @@ class SteamProfileCard:
         draw = ImageDraw.Draw(image)
         
         
-        draw.text((78,35), self.id, font=fontlarge)
-        txttowrt = "Joined: %s"  % (self.membersince)
+        draw.text((78,35), self.user_profile.personaname, font=fontlarge)
+        txttowrt = "Joined: %s"  % (datetime.utcfromtimestamp(int(self.user_profile.timecreated)).strftime('%B %d, %Y'))
         draw.text((70,52), txttowrt, font=font)
-        txttowrt = "Rating: %s %s" % (self.steamrating, self.__steamRatingConvert(float(self.steamrating)))
+        txttowrt = "Steam Level: %s" % (self.user_profile.steamlevel)
         draw.text((70,62), txttowrt, font=font)
-        txttowrt = "Played: %s hrs past 2 weeks" % (self.hoursplayed2wk)
+        txttowrt = "Played: %s hrs past 2 weeks" % (self.__get_2wk_playtime())
         draw.text((70,72), txttowrt, font=font)
-        
-        if self.status == "online" or self.status == "in-game":
+
+        if self.user_profile.personastate == "Online" or self.user_profile.personastate == "Snooze":
             statusimage = self.__onlineStateDraw("#00FF00")
         else:
             statusimage = self.__onlineStateDraw("#FF0000")
@@ -229,37 +150,40 @@ class SteamProfileCard:
         
         
         try:
-            avatarIM = Image.open(io.BytesIO(urlopen(self.avatarURL).read())).resize((55,55), Image.ANTIALIAS)
+            avatarIM = Image.open(io.BytesIO(urlopen(self.user_profile.avatarmedium).read())).resize((55,55), Image.ANTIALIAS)
             image.paste(avatarIM, (10,35))
         except:
             pass
         
-        if self.primarygroup:
+        if self.primary_group_profile:
             try:
-                groupIM = Image.open(io.BytesIO(urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+                groupIM = Image.open(io.BytesIO(urlopen(self.primary_group_profile.avataricon).read())).resize((20, 20), Image.ANTIALIAS)
                 image.paste(groupIM, (10,5))
             except:
                 pass
-            txttowrt = "\"%s\" Member" % (self.primarygroup['name'])
+            txttowrt = "\"%s\" Member" % (self.primary_group_profile.groupname)
             draw.text((10, 90), txttowrt, font=font)
-            draw.text((35,7), self.steamcustomurl, font=fontlarge)
+            if self.user_profile.profileurlname:
+                draw.text((35,7), self.user_profile.profileurlname, font=fontlarge)
         else:
-            draw.text((10,7), self.steamcustomurl, font=fontlarge)
+            if self.user_profile.profileurlname:
+                draw.text((10,7), self.user_profile.profileurlname, font=fontlarge)
             
-        if len(self.topGamesPlayed) > 0:
+        if len(self.user_profile.recentlyplayedgames) > 0:
             try:
-                firstgameIM = Image.open(io.BytesIO(urlopen(self.topGamesPlayed[0]['icon']).read()))
+                firstgameIM = Image.open(io.BytesIO(urlopen(self.user_profile.recentlyplayedgames[0]['img_icon_url']).read()))
                 image.paste(firstgameIM, (10,112))
             except:
                 pass
-            txttowrt = (self.topGamesPlayed[0]['name'][:22] + "...") if len(self.topGamesPlayed[0]['name']) > 22 else self.topGamesPlayed[0]['name']
+            txttowrt = (self.user_profile.recentlyplayedgames[0]['name'][:22] + "...") if len(self.user_profile.recentlyplayedgames[0]['name']) > 22 else self.user_profile.recentlyplayedgames[0]['name']
             draw.text((45, 112), txttowrt, font=font)
-            txttowrt = "%s hours" % (self.topGamesPlayed[0]['hoursplayed'])
+            txttowrt = "%s hours" % ((self.user_profile.recentlyplayedgames[0]['playtime_2weeks']+60//2)//60)
             draw.text((45,122), txttowrt, font=font)
-            xoffset = 133
-            for i in range(1,len(self.topGamesPlayed)):
+            xoffset = 138
+
+            for game in self.user_profile.recentlyplayedgames[1:3]:
                 try:
-                    gameIcon = Image.open(io.BytesIO(urlopen(self.topGamesPlayed[i]['icon']).read()))
+                    gameIcon = Image.open(io.BytesIO(urlopen(game['img_icon_url']).read()))
                     image.paste(gameIcon, (xoffset,112))
                     xoffset = xoffset + 35
                 except:
@@ -276,39 +200,39 @@ class SteamProfileCard:
         draw = ImageDraw.Draw(image)
         
         try:
-            avatarIM = Image.open(io.BytesIO(urlopen(self.avatarURL).read())).resize((40,40), Image.ANTIALIAS)
+            avatarIM = Image.open(io.BytesIO(urlopen(self.user_profile.avatarmedium).read())).resize((40,40), Image.ANTIALIAS)
             image.paste(avatarIM, (5,5))
         except:
             pass
         
-        if self.status == "online" or self.status == "in-game":
+        if self.user_profile.personastate == "Online" or self.user_profile.personastate == "Snooze":
             statusimage = self.__onlineStateDraw("#00FF00")
         else:
             statusimage = self.__onlineStateDraw("#FF0000")
         
         
-        if self.primarygroup:
+        if self.primary_group_profile:
             try:
-                groupIM = Image.open(io.BytesIO(urlopen(self.primarygroup['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+                groupIM = Image.open(io.BytesIO(urlopen(self.primary_group_profile.avataricon).read())).resize((20, 20), Image.ANTIALIAS)
                 image.paste(groupIM, (57,2))
             except:
                 pass
             image.paste(statusimage, (82, 9), statusimage)
-            draw.text((90,4), self.id, font=fontlarge)
+            draw.text((90,4), self.user_profile.personaname, font=fontlarge)
         else:
             image.paste(statusimage, (57, 9), statusimage)
-            draw.text((65,4), self.id, font=fontlarge)
+            draw.text((65,4), self.user_profile.personaname, font=fontlarge)
         
-        txttowrt = "Rating: %s %s" % (self.steamrating, self.__steamRatingConvert(float(self.steamrating)))
+        txttowrt = "Steam Level: %s" % (self.user_profile.steamlevel)
         draw.text((57,35), txttowrt, font=font)
         
-        txttowrt = "Played: %s hrs past 2 weeks" % (self.hoursplayed2wk)
+        txttowrt = "Played: %s hrs past 2 weeks" % (self.__get_2wk_playtime())
         draw.text((57,25), txttowrt, font=font)
 
         xoffset = 325
-        for game in reversed(self.topGamesPlayed):
+        for game in reversed(self.user_profile.recentlyplayedgames[:5]):
             try:
-                gameIcon = Image.open(io.BytesIO(urlopen(game['icon']).read())).resize((20, 20), Image.ANTIALIAS)
+                gameIcon = Image.open(io.BytesIO(urlopen(game['img_icon_url']).read())).resize((20, 20), Image.ANTIALIAS)
                 image.paste(gameIcon, (xoffset,25))
                 xoffset = xoffset - 25
             except:
@@ -337,12 +261,12 @@ class SteamProfileCard:
         """
         if self.profileGrabStatus == False:
             self.profileImage = self.__profileErrorDraw("had an error retrieving xml")
-        elif self.privacystate == "public":
+        elif not self.user_profile.communityvisibilitystate == "Private":
             if self.imgtype == "card":
                 self.profileImage = self.__publicProfileCardDraw()
             elif self.imgtype == "sig":
                 self.profileImage = self.__publicProfileSigDraw()
-        elif self.id:
+        elif self.user_profile.personaname:
             self.profileImage = self.__profileErrorDraw("is not public.")
         else:
             self.profileImage = self.__profileErrorDraw("doesn't exist.")
@@ -362,13 +286,8 @@ class SteamProfileCard:
 
 def main():
     card = SteamProfileCard("sinkigobopo", "card", "default")
-    
-    
     profileImg = card.drawProfileImg()
-    
-    
     profileImg.show()
-
 
 if __name__ == "__main__":
     main()

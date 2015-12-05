@@ -1,4 +1,4 @@
-# SteamProfileCard
+# SteamProfileCard [![Build Status](https://travis-ci.org/shawnsilva/steamprofilecard.svg)](https://travis-ci.org/shawnsilva/steamprofilecard)
 ## README
 
 ### Description
@@ -6,12 +6,19 @@ Using the Steam Web API this script will make a "gamer card" of a
 given Steam Profile and return a PNG image.
 
 This script will take the users steam url/id and use it to gather
-their profile information. The info is then turned into an image
-in the style of a "gamer card" or signature image for using in forums. 
-This can then be returned to output as an image file on a webpage or
-saved to disk.
+their profile information utilizing the 'steamwebapi' python module.
+The info is then turned into an image in the style of a "gamer card"
+or signature image for using in forums. This can then be returned to
+output as an image file on a webpage or saved to disk.
 
 ### How to use 
+
+#### Install
+The easiest way to install is `pip install steamprofilecard`. It is also
+possible to git clone the repository or download an archive from Github
+and run `python setup.py install` to have the package installed.
+
+#### Use
 ```python
 from steamprofilecard import SteamProfileCard
 profile = SteamProfileCard("customURLorID", "card", "template")
@@ -45,10 +52,14 @@ to be displayed.
 
 ###REQUIREMENTS
 * Python
+	* 3.5.*
+	* 3.4.*
     * 3.3.*
     * 3.2.*
     * 2.7.*
     * 2.6.*
 * Pillow (PIL Fork)(http://python-imaging.github.io/)
+	* 3.0.0
     * 2.1.0
     * 2.0.0
+

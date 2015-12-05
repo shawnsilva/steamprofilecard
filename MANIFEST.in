@@ -1,0 +1,3 @@
+include LICENSE README.md requirements.txt CHANGELOG.md
+recursive-include steamprofilecard/templates *.png
+recursive-include steamprofilecard/fonts *.tar.gz *.ttf
