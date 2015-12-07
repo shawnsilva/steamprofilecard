@@ -67,7 +67,15 @@ class SteamProfileCard:
         try:
             self.user_profile = profiles.get_user_profile(steamuserid)
             if self.user_profile.primaryclanid:
-                self.primary_group_profile = profiles.get_group_profile(self.user_profile.primaryclanid)
+                # Group ID '103582791429521408' is often encountered.
+                # In hex, that ID is '0x170000000000000' which has 0 in the 
+                # lower 32bits. There is no actual group ID, just the universe,
+                # account type identifiers, and the instance.
+                # https://developer.valvesoftware.com/wiki/SteamID
+                if (int(self.user_profile.primaryclanid) & 0x00000000FFFFFFFF) != 0:
+                    self.primary_group_profile = profiles.get_group_profile(self.user_profile.primaryclanid)
+                else:
+                    self.primary_group_profile = None
             else:
                 self.primary_group_profile = None
         except:
@@ -285,7 +293,7 @@ class SteamProfileCard:
         return self.imgStream.read()
 
 def main():
-    card = SteamProfileCard("sinkigobopo", "card", "default")
+    card = SteamProfileCard("vanityURL", "card", "default")
     profileImg = card.drawProfileImg()
     profileImg.show()
 
