@@ -35,28 +35,25 @@ else:
 import io, re, os
 from datetime import datetime
 import xml.etree.ElementTree as ET
-from PIL import Image, ImageFont, ImageDraw
+from PIL import Image, ImageFont, ImageDraw, ImageChops
 
 from steamwebapi import profiles
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#                      VARIABLES TO MODIFY                        #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
-#TEMPLATE_PATH = "/path/to/templates"
 
 FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
-#FONT_PATH = "/path/to/fonts"
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#                  END OF VARIABLES TO MODIFY                     #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-# CACHE_ENABLED = False            #Image cache to reduce server load.
-# CACHE_DURATION = 60            #Time in minutes images are cached for
-# CACHE_PATH = "/path/to/cache"    #Path to the folders to store the cached images.
 
 fontlarge = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 12, encoding="unic")
 font = ImageFont.truetype(os.path.join(FONT_PATH, "FreeSansBold.ttf"), 8, encoding="unic")
+sl_font = ImageFont.truetype(os.path.join(FONT_PATH, "slkscr.ttf"), 15, encoding="unic")
+
+def trim(im):
+    bg = Image.new(im.mode, im.size, im.getpixel((0,0)))
+    diff = ImageChops.difference(im, bg)
+    diff = ImageChops.add(diff, diff, 2.0, -100)
+    bbox = diff.getbbox()
+    if bbox:
+        return im.crop(bbox)
 
 class SteamProfileCard:
     def __init__(self, steamuserid, imgtype, template):
@@ -82,6 +79,10 @@ class SteamProfileCard:
             self.profileGrabStatus = False
 
     def __get_2wk_playtime(self):
+        """
+        Adds up playtime in each of the games in user_profile.recentlyplayedgames
+        and returns the total.
+        """
         games = self.user_profile.recentlyplayedgames
         minutes = 0
         for game in games:
@@ -114,7 +115,36 @@ class SteamProfileCard:
         draw.ellipse((0, 0, 100, 100), fill=color, outline="#000000")
         state = image.resize((5,5), Image.ANTIALIAS)
         return state
-    
+
+    def __drawSteamLevel(self, steam_level):
+        """
+        Creates a small circle with the users steam level
+        """
+        image = Image.new("RGBA", (101,101), color=(255, 255, 255, 0))
+        draw = ImageDraw.Draw(image)
+        draw.ellipse((0, 0, 100, 100), fill="#00FF00", outline=(255, 255, 255, 0))
+        draw.ellipse((5, 5, 95, 95), fill=(255, 255, 255, 0), outline=(255, 255, 255, 0))
+        circle = image.resize((35,35), Image.ANTIALIAS)
+
+        # Attempting to center text directly will often be a few pixels off
+        # in any direction due to how most fonts have varying heights for
+        # characters. ImageFont.getsize doesn't return the actual height of
+        # the 'visible' printed characters, but includes whitespace from the 
+        # font. To get around this, the text is written on a separate image and
+        # then that image is trimmed of all the empty space. This gets the
+        # correct width and height of the 'visible' text.
+        w, h = sl_font.getsize(steam_level)
+
+        text_img = Image.new("RGBA", (35,35), color=(255, 255, 255, 0))
+        text_draw = ImageDraw.Draw(text_img)
+        text_draw.text(((35-w)/2,(35-h)/2), steam_level, fill='#FFFFFF', font=sl_font)
+        text_trim = trim(text_img)
+
+        w, h = text_trim.size
+
+        circle.paste(text_trim, (int((35-w)/2),int((35-h)/2)) , text_trim)
+        return circle
+
     def __loadBaseTemplateImg(self, template):
         """
         Will load the base template for the profile card based on input. If the
@@ -125,9 +155,10 @@ class SteamProfileCard:
         templatefile = os.path.join(TEMPLATE_PATH, self.imgtype, template + ".png")
         if os.path.isfile(templatefile):
             try:
-                image = Image.open(templatefile).convert("RGB")
-                if image.size == self.imgsize:
-                    imageloaded = True
+                with open(templatefile, 'rb') as f:
+                    image = Image.open(f).convert("RGB")
+                    if image.size == self.imgsize:
+                        imageloaded = True
             except:
                 pass
         if imageloaded == False:
@@ -150,12 +181,18 @@ class SteamProfileCard:
         txttowrt = "Played: %s hrs past 2 weeks" % (self.__get_2wk_playtime())
         draw.text((70,72), txttowrt, font=font)
 
-        if self.user_profile.personastate == "Online" or self.user_profile.personastate == "Snooze":
+        if self.user_profile.personastate in ['Online', 'Looking to Trade', 'Looking to Play']:
             statusimage = self.__onlineStateDraw("#00FF00")
-        else:
+        elif self.user_profile.personastate in ['Away', 'Snooze']:
+            statusimage = self.__onlineStateDraw("#FF9933")
+        elif self.user_profile.personastate in ['Busy']:
             statusimage = self.__onlineStateDraw("#FF0000")
+        else:
+            statusimage = self.__onlineStateDraw("#A3A3A3")
         image.paste(statusimage, (70, 40), statusimage)
         
+        steam_level_image = self.__drawSteamLevel(str(self.user_profile.steamlevel))
+        image.paste(steam_level_image, (165, 10), steam_level_image)
         
         try:
             avatarIM = Image.open(io.BytesIO(urlopen(self.user_profile.avatarmedium).read())).resize((55,55), Image.ANTIALIAS)
@@ -236,6 +273,11 @@ class SteamProfileCard:
         
         txttowrt = "Played: %s hrs past 2 weeks" % (self.__get_2wk_playtime())
         draw.text((57,25), txttowrt, font=font)
+
+        # This doesn't look very good, and the entire sig needs to have a 
+        # new layout.
+        # steam_level_image = self.__drawSteamLevel(str(self.user_profile.steamlevel))
+        # image.paste(steam_level_image, (175, 7), steam_level_image)
 
         xoffset = 325
         for game in reversed(self.user_profile.recentlyplayedgames[:5]):

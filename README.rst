@@ -1,7 +1,8 @@
-# SteamProfileCard [![Build Status](https://travis-ci.org/shawnsilva/steamprofilecard.svg)](https://travis-ci.org/shawnsilva/steamprofilecard)
-## README
+SteamProfileCard
+----------------
 
-### Description
+|buildstatus|
+
 Using the Steam Web API this script will make a "gamer card" of a
 given Steam Profile and return a PNG image.
 
@@ -11,26 +12,33 @@ The info is then turned into an image in the style of a "gamer card"
 or signature image for using in forums. This can then be returned to
 output as an image file on a webpage or saved to disk.
 
-### How to use 
+How to use
+~~~~~~~~~~
 
-#### Install
-The easiest way to install is `pip install steamprofilecard`. It is also
+Install
+^^^^^^^
+
+The easiest way to install is ``pip install steamprofilecard``. It is also
 possible to git clone the repository or download an archive from Github
-and run `python setup.py install` to have the package installed.
+and run ``python setup.py install`` to have the package installed.
 
-#### Use
-```python
-from steamprofilecard import SteamProfileCard
-profile = SteamProfileCard("customURLorID", "card", "template")
-card = profile.drawProfileCard()
-```
+Use
+^^^
+
+.. code:: python
+
+    from steamprofilecard import SteamProfileCard
+    profile = SteamProfileCard("customURLorID", "card", "template")
+    card = profile.drawProfileCard()
+
 
 or
 
-```python
-card.save("/path/to/save/image.png", "PNG")
-pngimg = profile.imageToWeb()
-```
+.. code:: python
+
+    card.save("/path/to/save/image.png", "PNG")
+    pngimg = profile.imageToWeb()
+
 
 SteamProfileCard(id, type, template) creates the profile object.
 The "id" is your Steam ID or your Steam Custom URL. The "type"
@@ -50,16 +58,22 @@ a web browser with the Content Type set to image/png. This allows
 the script to be called as an image allowing dynamic profile status
 to be displayed.
 
-###REQUIREMENTS
+REQUIREMENTS
+~~~~~~~~~~~~
+
 * Python
-	* 3.5.*
-	* 3.4.*
+    * 3.5.*
+    * 3.4.*
     * 3.3.*
     * 3.2.*
     * 2.7.*
     * 2.6.*
 * Pillow (PIL Fork)(http://python-imaging.github.io/)
-	* 3.0.0
+    * 3.0.0
     * 2.1.0
     * 2.0.0
+
+
+.. |buildstatus| image:: https://travis-ci.org/shawnsilva/steamprofilecard.svg?branch=master
+    :target: https://travis-ci.org/shawnsilva/steamprofilecard
 

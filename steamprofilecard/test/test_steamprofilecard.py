@@ -19,15 +19,19 @@
 
 import unittest
 
-from PIL import Image
+#from PIL import Image
 
 from steamprofilecard.steamprofilecard import SteamProfileCard
 
 class TestSteamProfileCard(unittest.TestCase):
-	def setUp(self):
-		self.profile_card = SteamProfileCard('vanityurl','card','default')
-		self.profile_sig = SteamProfileCard('vanityurl','sig','default')
+    def setUp(self):
+        self.profile_card = SteamProfileCard('vanityurl','card','default')
+        self.profile_sig = SteamProfileCard('vanityurl','sig','default')
 
-	def test_validate_image_creation(self):
-		profile_card_img = self.profile_card.drawProfileImg()
-		profile_sig_img = self.profile_sig.drawProfileImg()
+    def tearDown(self):
+        del(self.profile_card)
+        del(self.profile_sig)
+
+    def test_validate_image_creation(self):
+        profile_card_img = self.profile_card.drawProfileImg()
+        profile_sig_img = self.profile_sig.drawProfileImg()
