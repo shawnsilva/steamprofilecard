@@ -72,7 +72,8 @@ REQUIREMENTS
     * 3.0.0
     * 2.1.0
     * 2.0.0
-
+* steamwebapi
+    * >= 0.1.1
 
 .. |buildstatus| image:: https://travis-ci.org/shawnsilva/steamprofilecard.svg?branch=master
     :target: https://travis-ci.org/shawnsilva/steamprofilecard

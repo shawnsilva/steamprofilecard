@@ -116,15 +116,19 @@ class SteamProfileCard:
         state = image.resize((5,5), Image.ANTIALIAS)
         return state
 
-    def __drawSteamLevel(self, steam_level):
+    def __drawSteamLevel(self, steam_level, circle_color='#00FF00', text_color='#FFFFFF', img_size=29):
         """
         Creates a small circle with the users steam level
         """
+        # Final Steam Level image width and height
+        sl_w = img_size
+        sl_h = img_size
+
         image = Image.new("RGBA", (101,101), color=(255, 255, 255, 0))
         draw = ImageDraw.Draw(image)
-        draw.ellipse((0, 0, 100, 100), fill="#00FF00", outline=(255, 255, 255, 0))
+        draw.ellipse((0, 0, 100, 100), fill=circle_color, outline=(255, 255, 255, 0))
         draw.ellipse((5, 5, 95, 95), fill=(255, 255, 255, 0), outline=(255, 255, 255, 0))
-        circle = image.resize((35,35), Image.ANTIALIAS)
+        circle = image.resize((sl_w,sl_h), Image.ANTIALIAS)
 
         # Attempting to center text directly will often be a few pixels off
         # in any direction due to how most fonts have varying heights for
@@ -135,14 +139,21 @@ class SteamProfileCard:
         # correct width and height of the 'visible' text.
         w, h = sl_font.getsize(steam_level)
 
-        text_img = Image.new("RGBA", (35,35), color=(255, 255, 255, 0))
+        text_img = Image.new("RGBA", (100,100), color=(255, 255, 255, 0))
         text_draw = ImageDraw.Draw(text_img)
-        text_draw.text(((35-w)/2,(35-h)/2), steam_level, fill='#FFFFFF', font=sl_font)
+        text_draw.text(((100-w)/2,(100-h)/2), steam_level, fill=text_color, font=sl_font)
         text_trim = trim(text_img)
 
         w, h = text_trim.size
+        # Max width = 23
+        max_w = sl_w-6
+        if w > max_w:
+            width_percent = (max_w/float(w))
+            new_h = int((float(h)*float(width_percent)))
+            text_trim = text_trim.resize((max_w,new_h), Image.ANTIALIAS)
+            w, h = text_trim.size
 
-        circle.paste(text_trim, (int((35-w)/2),int((35-h)/2)) , text_trim)
+        circle.paste(text_trim, (int((sl_w-w)/2),int((sl_h-h)/2)) , text_trim)
         return circle
 
     def __loadBaseTemplateImg(self, template):
@@ -173,13 +184,13 @@ class SteamProfileCard:
         draw = ImageDraw.Draw(image)
         
         
-        draw.text((78,35), self.user_profile.personaname, font=fontlarge)
+        draw.text((73,35), self.user_profile.personaname, font=fontlarge)
         txttowrt = "Joined: %s"  % (datetime.utcfromtimestamp(int(self.user_profile.timecreated)).strftime('%B %d, %Y'))
-        draw.text((70,52), txttowrt, font=font)
+        draw.text((65,52), txttowrt, font=font)
         txttowrt = "Steam Level: %s" % (self.user_profile.steamlevel)
-        draw.text((70,62), txttowrt, font=font)
+        draw.text((65,62), txttowrt, font=font)
         txttowrt = "Played: %s hrs past 2 weeks" % (self.__get_2wk_playtime())
-        draw.text((70,72), txttowrt, font=font)
+        draw.text((65,72), txttowrt, font=font)
 
         if self.user_profile.personastate in ['Online', 'Looking to Trade', 'Looking to Play']:
             statusimage = self.__onlineStateDraw("#00FF00")
@@ -189,41 +200,41 @@ class SteamProfileCard:
             statusimage = self.__onlineStateDraw("#FF0000")
         else:
             statusimage = self.__onlineStateDraw("#A3A3A3")
-        image.paste(statusimage, (70, 40), statusimage)
+        image.paste(statusimage, (65, 40), statusimage)
         
         steam_level_image = self.__drawSteamLevel(str(self.user_profile.steamlevel))
-        image.paste(steam_level_image, (165, 10), steam_level_image)
+        image.paste(steam_level_image, (176, 5), steam_level_image)
         
         try:
             avatarIM = Image.open(io.BytesIO(urlopen(self.user_profile.avatarmedium).read())).resize((55,55), Image.ANTIALIAS)
-            image.paste(avatarIM, (10,35))
+            image.paste(avatarIM, (5,35))
         except:
             pass
         
         if self.primary_group_profile:
             try:
                 groupIM = Image.open(io.BytesIO(urlopen(self.primary_group_profile.avataricon).read())).resize((20, 20), Image.ANTIALIAS)
-                image.paste(groupIM, (10,5))
+                image.paste(groupIM, (5,5))
             except:
                 pass
             txttowrt = "\"%s\" Member" % (self.primary_group_profile.groupname)
-            draw.text((10, 90), txttowrt, font=font)
+            draw.text((5, 90), txttowrt, font=font)
             if self.user_profile.profileurlname:
-                draw.text((35,7), self.user_profile.profileurlname, font=fontlarge)
+                draw.text((30,7), self.user_profile.profileurlname, font=fontlarge)
         else:
             if self.user_profile.profileurlname:
-                draw.text((10,7), self.user_profile.profileurlname, font=fontlarge)
+                draw.text((5,7), self.user_profile.profileurlname, font=fontlarge)
             
         if len(self.user_profile.recentlyplayedgames) > 0:
             try:
                 firstgameIM = Image.open(io.BytesIO(urlopen(self.user_profile.recentlyplayedgames[0]['img_icon_url']).read()))
-                image.paste(firstgameIM, (10,112))
+                image.paste(firstgameIM, (5,112))
             except:
                 pass
-            txttowrt = (self.user_profile.recentlyplayedgames[0]['name'][:22] + "...") if len(self.user_profile.recentlyplayedgames[0]['name']) > 22 else self.user_profile.recentlyplayedgames[0]['name']
-            draw.text((45, 112), txttowrt, font=font)
+            txttowrt = (self.user_profile.recentlyplayedgames[0]['name'][:23] + "...") if len(self.user_profile.recentlyplayedgames[0]['name']) > 25 else self.user_profile.recentlyplayedgames[0]['name']
+            draw.text((40, 112), txttowrt, font=font)
             txttowrt = "%s hours" % ((self.user_profile.recentlyplayedgames[0]['playtime_2weeks']+60//2)//60)
-            draw.text((45,122), txttowrt, font=font)
+            draw.text((40,122), txttowrt, font=font)
             xoffset = 138
 
             for game in self.user_profile.recentlyplayedgames[1:3]:
